@@ -19,6 +19,12 @@
           uvicorn
           pydantic
           openai
+          pytest
+          httpx
+          jieba
+          numpy
+          pandas
+          torch
         ]);
       in {
         devShells.default = pkgs.mkShell {

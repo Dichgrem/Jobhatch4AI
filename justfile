@@ -5,6 +5,7 @@ frontend_dir := justfile_directory() / "src/frontend"
 
 # 安装依赖
 install:
+    pip install fastapi uvicorn pydantic openai pytest httpx
     cd {{frontend_dir}} && bun install
 
 # 启动后端
@@ -19,6 +20,10 @@ frontend:
 start:
     {{run_backend}} &
     cd {{frontend_dir}} && bun dev
+
+# 运行测试
+test:
+    python3 -m pytest src/backend/tests -v
 
 # 停止所有服务
 stop:

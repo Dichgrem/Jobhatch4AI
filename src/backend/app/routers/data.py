@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import numpy as np
@@ -219,7 +220,6 @@ async def cluster_data(data: dict):
     result = cluster_jobs(texts, n_clusters, sample_size)
 
     from app.services.database import get_db
-    import json
 
     conn = get_db()
     conn.execute(
@@ -264,7 +264,6 @@ def _load_texts() -> list[str]:
 @router.get("/cluster")
 async def get_cluster_result():
     from app.services.database import get_db
-    import json
 
     conn = get_db()
     row = conn.execute(
@@ -274,3 +273,171 @@ async def get_cluster_result():
     if row:
         return json.loads(row["value"])
     return {"n_clusters": 0, "clusters": []}
+
+
+@router.post("/embed")
+async def run_embedding_pipeline(data: dict):
+    from app.services.embedding import batch_embed, save_embeddings
+    from app.services.vector_search import build_index, save_texts
+
+    texts = data.get("texts", [])
+    if not texts:
+        texts = _load_texts()
+    if not texts:
+        raise HTTPException(status_code=400, detail="请先上传数据或提供文本列表")
+
+    max_samples = data.get("max_samples", 5000)
+    if len(texts) > max_samples:
+        indices = np.random.choice(len(texts), max_samples, replace=False)
+        texts = [texts[i] for i in indices]
+
+    embeddings = batch_embed(texts, batch_size=64, normalize=True)
+    save_embeddings(embeddings, "job_embeddings")
+
+    save_texts(texts, "job_index")
+
+    ids = [f"job_{i}" for i in range(len(texts))]
+    idx_info = build_index(embeddings, ids, "job_index")
+
+    return {
+        "total_embedded": len(texts),
+        "embedding_dim": embeddings.shape[1],
+        "index": idx_info,
+    }
+
+
+@router.get("/tsne")
+async def get_tsne(force: bool = False, sample_size: int = 3000, perplexity: int = 30):
+    from app.services.embedding import load_embeddings
+    from app.services.tsne_viz import compute_tsne, save_tsne, load_tsne
+
+    if not force:
+        cached = load_tsne("tsne_coords")
+        if cached:
+            return cached
+
+    embeddings = load_embeddings("job_embeddings")
+    if embeddings is None:
+        raise HTTPException(
+            status_code=404,
+            detail="未找到嵌入向量，请先调用 POST /api/data/embed",
+        )
+
+    result = compute_tsne(embeddings, sample_size=sample_size, perplexity=perplexity)
+    save_tsne(result, "tsne_coords")
+    return result
+
+
+@router.post("/vector-search")
+async def vector_search(data: dict):
+    from app.services.embedding import text_to_embedding
+    from app.services.vector_search import search, index_exists
+
+    query = data.get("query", "")
+    top_k = data.get("top_k", 5)
+
+    if not query:
+        raise HTTPException(status_code=400, detail="请提供查询文本")
+
+    if not index_exists("job_index"):
+        raise HTTPException(
+            status_code=404,
+            detail="未找到向量索引，请先调用 POST /api/data/embed",
+        )
+
+    query_vec = text_to_embedding(query)
+    results = search(query_vec, top_k, "job_index")
+
+    return {"query": query, "results": results, "total": len(results)}
+
+
+@router.post("/train-embedding-mlp")
+async def train_embedding_classifier(data: dict):
+    from app.services.embedding import load_embeddings, batch_embed
+    from app.services.classifier import (
+        EmbeddingMLPClassifier,
+        save_embedding_model,
+        train_embedding_mlp,
+    )
+
+    texts: list[str] = data.get("texts", [])
+    labels: list[str] = data.get("labels", [])
+
+    if len(texts) < 10 or len(labels) < 10:
+        raise HTTPException(status_code=400, detail="至少需要10条训练数据")
+
+    embeddings_raw = load_embeddings("job_embeddings")
+    if embeddings_raw is not None and len(embeddings_raw) >= len(texts):
+        x = embeddings_raw[: len(texts)]
+    else:
+        x = batch_embed(texts, batch_size=64, normalize=True)
+
+    unique_labels = sorted(set(labels))
+    label_map = {lbl: i for i, lbl in enumerate(unique_labels)}
+    y = np.array([label_map[lbl] for lbl in labels])
+
+    split = int(len(x) * 0.8)
+    x_train, x_val = x[:split], x[split:]
+    y_train, y_val = y[:split], y[split:]
+
+    num_classes = len(unique_labels)
+    if num_classes < 2:
+        raise HTTPException(
+            status_code=400, detail="至少需要2个不同标签用于分类训练"
+        )
+
+    model = EmbeddingMLPClassifier(
+        input_dim=x.shape[1],
+        hidden_dim=512,
+        num_classes=num_classes,
+    )
+    history = train_embedding_mlp(
+        model, x_train, y_train, x_val, y_val, epochs=30
+    )
+
+    path = save_embedding_model(model, unique_labels, "embedding_mlp")
+
+    return {
+        "model_path": str(path),
+        "input_dim": x.shape[1],
+        "num_classes": num_classes,
+        "label_names": unique_labels,
+        "train_samples": len(x_train),
+        "val_samples": len(x_val),
+        "history": history,
+    }
+
+
+@router.post("/predict-embedding-mlp")
+async def predict_embedding_classifier(data: dict):
+    from app.services.embedding import text_to_embedding
+    from app.services.classifier import load_embedding_model
+
+    texts: list[str] = data.get("texts", [])
+    if not texts:
+        raise HTTPException(status_code=400, detail="请提供待预测文本")
+
+    result = load_embedding_model("embedding_mlp")
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail="未找到已训练的嵌入分类器，请先调用 POST /api/data/train-embedding-mlp",
+        )
+
+    model, label_names = result
+    embeddings = np.array(
+        [text_to_embedding(t) for t in texts], dtype=np.float32
+    )
+    x = torch.tensor(embeddings, dtype=torch.float32)
+    preds, probs = model.predict(x)
+
+    return {
+        "predictions": [
+            {
+                "text": t,
+                "label": label_names[p],
+                "confidence": float(probs[i][p]),
+            }
+            for i, (t, p) in enumerate(zip(texts, preds))
+        ]
+    }

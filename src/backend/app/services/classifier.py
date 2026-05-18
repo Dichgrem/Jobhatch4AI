@@ -124,6 +124,132 @@ def train_mlp(
     return history
 
 
+class EmbeddingMLPClassifier(nn.Module):
+    def __init__(
+        self,
+        input_dim: int = 1024,
+        hidden_dim: int = 512,
+        num_classes: int = 3,
+    ):
+        super().__init__()
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.bn1 = nn.BatchNorm1d(hidden_dim)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(0.3)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim // 2)
+        self.bn2 = nn.BatchNorm1d(hidden_dim // 2)
+        self.fc3 = nn.Linear(hidden_dim // 2, num_classes)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.relu(self.bn1(self.fc1(x)))
+        x = self.dropout(x)
+        x = self.relu(self.bn2(self.fc2(x)))
+        x = self.dropout(x)
+        return self.fc3(x)
+
+    def predict(self, x: torch.Tensor) -> tuple[np.ndarray, np.ndarray]:
+        self.eval()
+        with torch.no_grad():
+            logits = self.forward(x)
+            probs = torch.softmax(logits, dim=1)
+            preds = torch.argmax(probs, dim=1)
+        return preds.numpy(), probs.numpy()
+
+
+def save_embedding_model(
+    model: EmbeddingMLPClassifier,
+    label_names: list[str],
+    name: str = "embedding_mlp",
+) -> Path:
+    MODEL_DIR.mkdir(parents=True, exist_ok=True)
+    torch.save(model.state_dict(), MODEL_DIR / f"{name}.pt")
+    meta = {
+        "input_dim": model.fc1.in_features,
+        "hidden_dim": model.fc1.out_features,
+        "num_classes": model.fc3.out_features,
+        "label_names": label_names,
+    }
+    (MODEL_DIR / f"{name}.json").write_text(
+        json.dumps(meta, ensure_ascii=False, indent=2)
+    )
+    return MODEL_DIR / f"{name}.pt"
+
+
+def load_embedding_model(
+    name: str = "embedding_mlp",
+) -> tuple[EmbeddingMLPClassifier, list[str]] | None:
+    weights_path = MODEL_DIR / f"{name}.pt"
+    meta_path = MODEL_DIR / f"{name}.json"
+    if not weights_path.exists() or not meta_path.exists():
+        return None
+    meta = json.loads(meta_path.read_text())
+    model = EmbeddingMLPClassifier(
+        meta["input_dim"], meta["hidden_dim"], meta["num_classes"]
+    )
+    model.load_state_dict(
+        torch.load(str(weights_path), map_location="cpu", weights_only=True)
+    )
+    model.eval()
+    return model, meta["label_names"]
+
+
+def train_embedding_mlp(
+    model: EmbeddingMLPClassifier,
+    x_train: np.ndarray,
+    y_train: np.ndarray,
+    x_val: np.ndarray | None = None,
+    y_val: np.ndarray | None = None,
+    epochs: int = 30,
+    lr: float = 0.001,
+    batch_size: int = 64,
+) -> list[dict]:
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+
+    x_tensor = torch.tensor(x_train, dtype=torch.float32).to(device)
+    y_tensor = torch.tensor(y_train, dtype=torch.long).to(device)
+
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
+    history: list[dict] = []
+    n_samples = len(x_train)
+
+    for epoch in range(epochs):
+        model.train()
+        total_loss = 0.0
+
+        indices = np.random.permutation(n_samples)
+        for i in range(0, n_samples, batch_size):
+            batch_idx = indices[i : i + batch_size]
+            x_batch = x_tensor[batch_idx]
+            y_batch = y_tensor[batch_idx]
+
+            optimizer.zero_grad()
+            logits = model(x_batch)
+            loss = criterion(logits, y_batch)
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item() * len(batch_idx)
+
+        avg_loss = total_loss / n_samples
+        metrics = {"epoch": epoch + 1, "loss": avg_loss}
+
+        if x_val is not None and y_val is not None:
+            model.eval()
+            with torch.no_grad():
+                x_val_t = torch.tensor(x_val, dtype=torch.float32).to(device)
+                y_val_t = torch.tensor(y_val, dtype=torch.long).to(device)
+                val_logits = model(x_val_t)
+                val_preds = torch.argmax(val_logits, dim=1)
+                val_acc = (val_preds == y_val_t).float().mean().item()
+            metrics["val_accuracy"] = val_acc
+
+        history.append(metrics)
+
+    return history
+
+
 def count_skills_by_category(
     token_lists: dict[str, list[list[str]]],
     tech_terms: list[str],

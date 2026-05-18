@@ -38,3 +38,9 @@ Thumbs.db
 src/backend/.env
 src/backend/data/*.json
 src/backend/data/*.dta
+src/backend/data/embeddings/
+src/backend/data/vector_index/
+src/backend/data/tsne/
+src/backend/data/models/
+*.pt
+*.npy

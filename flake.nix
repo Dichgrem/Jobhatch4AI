@@ -34,7 +34,6 @@
           buildInputs = [
             python
             pkgs.bun
-            pkgs.uv
           ];
         };
       }

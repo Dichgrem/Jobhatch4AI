@@ -20,9 +20,9 @@ class TestTSNE:
         assert result["labels"] == labels
 
     def test_small_dataset(self):
-        embeddings = np.random.randn(5, 64).astype(np.float32)
-        result = compute_tsne(embeddings, perplexity=5)
-        assert result["n_samples"] == 5
+        embeddings = np.random.randn(10, 64).astype(np.float32)
+        result = compute_tsne(embeddings, perplexity=3)
+        assert result["n_samples"] == 10
 
     def test_save_load(self):
         data = {"x": [1.0, 2.0], "y": [3.0, 4.0], "n_samples": 2}

@@ -3,6 +3,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -12,6 +14,9 @@ from main import app
 @pytest.fixture
 def client():
     return TestClient(app)
+
+
+has_llm_key = bool(os.environ.get("LLM_API_KEY") or os.environ.get("ARK_API_KEY"))
 
 
 @pytest.fixture
@@ -128,7 +133,7 @@ class TestAuthEndpoints:
 
 
 class TestChatEndpoint:
-    @pytest.mark.skip(reason="requires ARK_API_KEY")
+    @pytest.mark.skipif(not has_llm_key, reason="requires LLM_API_KEY")
     def test_chat_returns_200(self, client, auth_token):
         resp = client.post(
             "/api/chat",
@@ -136,7 +141,7 @@ class TestChatEndpoint:
         )
         assert resp.status_code == 200
 
-    @pytest.mark.skip(reason="requires ARK_API_KEY")
+    @pytest.mark.skipif(not has_llm_key, reason="requires LLM_API_KEY")
     def test_chat_without_auth_returns_200(self, client):
         resp = client.post(
             "/api/chat",
@@ -144,7 +149,7 @@ class TestChatEndpoint:
         )
         assert resp.status_code == 200
 
-    @pytest.mark.skip(reason="requires ARK_API_KEY")
+    @pytest.mark.skipif(not has_llm_key, reason="requires LLM_API_KEY")
     def test_chat_has_sse_header(self, client):
         resp = client.post(
             "/api/chat",

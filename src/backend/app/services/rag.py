@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from app.services.llm import client
+from app.services.llm import _get_client
 from app.services.pipeline import load_pipeline_state
 from app.config import LLM_MODEL
 
@@ -92,7 +92,7 @@ def build_rag_prompt_with_semantic(
 
 
 def generate(data: list[dict[str, str]]) -> str:
-    response = client.chat.completions.create(
+    response = _get_client().chat.completions.create(
         model=LLM_MODEL,
         messages=data,
     )
@@ -100,7 +100,7 @@ def generate(data: list[dict[str, str]]) -> str:
 
 
 def generate_stream(data: list[dict[str, str]]):
-    stream = client.chat.completions.create(
+    stream = _get_client().chat.completions.create(
         model=LLM_MODEL,
         messages=data,
         stream=True,

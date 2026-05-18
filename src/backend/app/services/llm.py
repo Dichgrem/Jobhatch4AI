@@ -2,11 +2,18 @@ from openai import OpenAI
 
 from app.config import LLM_API_KEY, LLM_BASE_URL, LLM_MODEL
 
-client = OpenAI(api_key=LLM_API_KEY, base_url=LLM_BASE_URL)
+_client = None
+
+
+def _get_client():
+    global _client
+    if _client is None:
+        _client = OpenAI(api_key=LLM_API_KEY, base_url=LLM_BASE_URL)
+    return _client
 
 
 def chat(messages: list[dict[str, str]]) -> str:
-    response = client.chat.completions.create(
+    response = _get_client().chat.completions.create(
         model=LLM_MODEL,
         messages=messages,
     )
@@ -14,7 +21,7 @@ def chat(messages: list[dict[str, str]]) -> str:
 
 
 def chat_stream(messages: list[dict[str, str]]):
-    stream = client.chat.completions.create(
+    stream = _get_client().chat.completions.create(
         model=LLM_MODEL,
         messages=messages,
         stream=True,

@@ -17,12 +17,13 @@ backend:
 
 # 启动前端
 frontend:
-    cd {{frontend_dir}} && bun dev
+    cd {{frontend_dir}} && bun install && bun dev -- --host 0.0.0.0
 
 # 同时启动前后端
 start:
+    @fuser -k 8000/tcp 2>/dev/null || true
     uv run uvicorn{{backend_args}} &
-    cd {{frontend_dir}} && bun dev
+    cd {{frontend_dir}} && bun install && bun dev -- --host 0.0.0.0
 
 # 停止所有服务
 stop:

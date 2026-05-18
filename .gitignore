@@ -30,3 +30,11 @@ Thumbs.db
 
 # uv 包管理器缓存
 .uv_cache/
+
+# SQLite
+*.db
+*.db-journal
+*.db-wal
+src/backend/.env
+src/backend/data/*.json
+src/backend/data/*.dta

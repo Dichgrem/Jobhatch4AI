@@ -1,8 +1,8 @@
 from openai import OpenAI
 
-from app.config import ARK_API_KEY, ARK_BASE_URL, LLM_MODEL
+from app.config import LLM_API_KEY, LLM_BASE_URL, LLM_MODEL
 
-client = OpenAI(api_key=ARK_API_KEY, base_url=ARK_BASE_URL)
+client = OpenAI(api_key=LLM_API_KEY, base_url=LLM_BASE_URL)
 
 
 def chat(messages: list[dict[str, str]]) -> str:

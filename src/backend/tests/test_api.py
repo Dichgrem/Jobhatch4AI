@@ -219,3 +219,10 @@ class TestDataEndpoints:
             },
         )
         assert resp.status_code == 400
+
+
+class TestChatContext:
+    def test_context_endpoint(self, client):
+        resp = client.get("/api/chat/context")
+        assert resp.status_code == 200
+        assert "context" in resp.json()

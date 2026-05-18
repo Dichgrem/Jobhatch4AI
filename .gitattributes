@@ -1,10 +1,8 @@
 * text=auto
-
 # 锁文件标记为自动生成
 uv.lock linguist-generated=true
 bun.lock linguist-generated=true
 bun.lockb linguist-generated=true
-
 # 二进制文件
 *.png binary
 *.jpg binary
@@ -15,3 +13,4 @@ bun.lockb linguist-generated=true
 *.svg binary
 *.pdf binary
 *.pptx binary
+data/上市公司招聘数据2026.* filter=lfs diff=lfs merge=lfs -text

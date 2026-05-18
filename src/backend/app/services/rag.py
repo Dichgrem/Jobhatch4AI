@@ -3,13 +3,13 @@ from pathlib import Path
 from app.services.llm import client
 from app.config import LLM_MODEL
 
-SYSTEM_PROMPT = """你是一个招聘数据分析助手。你可以帮助用户：
-1. 根据用户的技能推荐合适的岗位方向
-2. 分析不同岗位的技术栈需求
-3. 提供求职和职业发展建议
-4. 回答关于招聘市场趋势的问题
+SYSTEM_PROMPT = """你是一个招聘数据智能分析助手。基于用户已上传的招聘数据集，你可以帮助用户：
+1. 分析薪资分布、学历要求、经验门槛等市场趋势
+2. 根据用户的技能推荐匹配的岗位方向
+3. 分析不同岗位的技术栈需求差异
+4. 提供求职策略和职业发展建议
 
-请在回答时引用数据支撑你的观点，保持专业、客观的语气。"""
+请在回答时引用数据集中的具体数字，保持专业、客观的语气。如果没有数据支撑，请如实告知用户需要先上传招聘数据。"""
 
 
 def build_rag_prompt(query: str, context_chunks: list[str]) -> list[dict[str, str]]:

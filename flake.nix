@@ -25,6 +25,9 @@
           numpy
           pandas
           torch
+          python-multipart
+          python-dotenv
+          scikit-learn
         ]);
       in {
         devShells.default = pkgs.mkShell {

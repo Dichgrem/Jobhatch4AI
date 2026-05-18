@@ -1,6 +1,6 @@
 set := justfile_directory()
 
-run_backend := "python3 -m fastapi dev src/backend/main.py --port 8000"
+run_backend := "uvicorn main:app --reload --port 8000 --app-dir " + justfile_directory() / "src/backend"
 frontend_dir := justfile_directory() / "src/frontend"
 
 # 安装依赖

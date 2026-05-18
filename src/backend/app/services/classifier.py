@@ -1,10 +1,13 @@
+import json
 from collections import Counter
+from pathlib import Path
 
 import numpy as np
 import torch
 import torch.nn as nn
 
-from app.services.preprocess import text_to_bow
+
+MODEL_DIR = Path(__file__).parent.parent.parent / "data" / "models"
 
 
 class MLPClassifier(nn.Module):
@@ -25,6 +28,43 @@ class MLPClassifier(nn.Module):
             probs = torch.softmax(logits, dim=1)
             preds = torch.argmax(probs, dim=1)
         return preds.numpy(), probs.numpy()
+
+
+def save_model(
+    model: MLPClassifier,
+    vocab: list[str],
+    label_names: list[str],
+    name: str = "mlp_classifier",
+) -> Path:
+    MODEL_DIR.mkdir(parents=True, exist_ok=True)
+    torch.save(model.state_dict(), MODEL_DIR / f"{name}.pt")
+    meta = {
+        "input_dim": model.fc1.in_features,
+        "hidden_dim": model.fc1.out_features,
+        "num_classes": model.fc2.out_features,
+        "vocab": vocab,
+        "label_names": label_names,
+    }
+    (MODEL_DIR / f"{name}.json").write_text(
+        json.dumps(meta, ensure_ascii=False, indent=2)
+    )
+    return MODEL_DIR / f"{name}.pt"
+
+
+def load_model(
+    name: str = "mlp_classifier",
+) -> tuple[MLPClassifier, list[str], list[str]] | None:
+    weights_path = MODEL_DIR / f"{name}.pt"
+    meta_path = MODEL_DIR / f"{name}.json"
+    if not weights_path.exists() or not meta_path.exists():
+        return None
+    meta = json.loads(meta_path.read_text())
+    model = MLPClassifier(meta["input_dim"], meta["hidden_dim"], meta["num_classes"])
+    model.load_state_dict(
+        torch.load(str(weights_path), map_location="cpu", weights_only=True)
+    )
+    model.eval()
+    return model, meta["vocab"], meta["label_names"]
 
 
 def train_mlp(
@@ -82,19 +122,6 @@ def train_mlp(
         history.append(metrics)
 
     return history
-
-
-def classify_from_text(
-    model: MLPClassifier,
-    texts: list[str],
-    vocab: list[str],
-    tokenize_fn,
-) -> np.ndarray:
-    device = next(model.parameters()).device
-    vectors = np.array([text_to_bow(tokenize_fn(t), vocab) for t in texts])
-    x = torch.tensor(vectors, dtype=torch.float32).to(device)
-    preds, _ = model.predict(x)
-    return preds
 
 
 def count_skills_by_category(

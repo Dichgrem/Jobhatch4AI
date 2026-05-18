@@ -8,6 +8,8 @@ from app.routers import auth, chat, data
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from app.services.pipeline import auto_load_default_csv
+    auto_load_default_csv()
     yield
 
 

@@ -48,6 +48,17 @@ export function getSkillWordcloud() {
 	return request("/data/skill-wordcloud");
 }
 
+export function getClusters() {
+	return request("/data/cluster");
+}
+
+export function postCluster(n_clusters = 6) {
+	return request("/data/cluster", {
+		method: "POST",
+		body: JSON.stringify({ n_clusters }),
+	});
+}
+
 export async function chatStream(
 	message: string,
 	history: { role: string; content: string }[] = [],

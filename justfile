@@ -7,9 +7,13 @@ frontend_dir := justfile_directory() / "src/frontend"
 nix:
     nix develop --impure
 
-# Ubuntu: 用 uv 安装所有 Python 依赖（含 sentence-transformers）
+# Ubuntu: 用 uv-cpu.toml 安装全部 Python 依赖（CPU 版 torch）
 sync:
-    uv sync
+    cp uv-cpu.toml pyproject.toml && uv lock && uv sync
+
+# Ubuntu: GPU 版依赖
+sync-gpu:
+    cp uv-gpu.toml pyproject.toml && uv lock && uv sync
 
 # 启动后端
 backend:

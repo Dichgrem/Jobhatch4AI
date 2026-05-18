@@ -44,3 +44,5 @@ src/backend/data/tsne/
 src/backend/data/models/
 *.pt
 *.npy
+pyproject.toml
+uv.lock

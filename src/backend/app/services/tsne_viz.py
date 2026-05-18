@@ -25,7 +25,7 @@ def compute_tsne(
         n_components=2,
         perplexity=min(perplexity, max(5, len(embeddings) // 3)),
         random_state=random_state,
-        n_iter=1000,
+        max_iter=1000,
         verbose=0,
     )
     coords = tsne.fit_transform(embeddings.astype(np.float64))
